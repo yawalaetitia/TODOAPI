@@ -1,0 +1,203 @@
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Transfert d'Argent</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      background-color: #f1f5f9;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+    }
+
+    .container {
+      max-width: 600px;
+      width: 100%;
+      padding: 2rem;
+      background-color: white;
+      border-radius: 10px;
+      box-shadow: 0 10px 15px rgba(0,0,0,0.1);
+    }
+
+    h1, h2 {
+      text-align: center;
+      color: #1e293b;
+    }
+
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    label {
+      color: #334155;
+    }
+
+    input {
+      width: 100%;
+      padding: 0.5rem;
+      border: 1px solid #cbd5e1;
+      border-radius: 5px;
+    }
+
+    button {
+      background-color: #0ea5e9;
+      color: white;
+      padding: 0.7rem;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    button:hover {
+      background-color: #0284c7;
+    }
+
+    .result {
+      margin-top: 2rem;
+      background-color: #e2e8f0;
+      padding: 1rem;
+      border-radius: 5px;
+    }
+
+    .transaction {
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid #cbd5e1;
+    }
+
+    .actions button {
+      margin-top: 0.5rem;
+      margin-right: 0.5rem;
+      padding: 0.3rem 0.5rem;
+      font-size: 0.9rem;
+    }
+
+    .edit {
+      background-color: #f59e0b;
+    }
+
+    .delete {
+      background-color: #ef4444;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1>Nouvelle Transaction</h1>
+
+    <form id="form">
+      <input type="hidden" name="id" id="transaction_id">
+      <label>Date:
+        <input type="date" name="date" required>
+      </label>
+      <label>Heure:
+        <input type="time" name="heure" required>
+      </label>
+      <label>Montant:
+        <input type="number" name="montant" step="0.01" required>
+      </label>
+      <label>Type de transaction (depot ou retrait):
+        <input type="text" name="type_transaction" required>
+      </label>
+      <label>Numéro du destinataire:
+        <input type="text" name="numero_destinataire" required>
+      </label>
+      <button type="submit">Enregistrer</button>
+    </form>
+
+    <div class="result" id="resultat">
+      <h2>Transactions récentes :</h2>
+      <div id="transactions"></div>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById('form');
+    const transactionsDiv = document.getElementById('transactions');
+    const idField = document.getElementById('transaction_id');
+
+    async function chargerTransactions() {
+      const res = await fetch('/transactions');
+      const data = await res.json();
+      transactionsDiv.innerHTML = "";
+      data.reverse().forEach(t => {
+        const div = document.createElement('div');
+        div.className = "transaction";
+        const pageCotent = `
+          <strong>${t.type_transaction.toUpperCase()}</strong> - ${t.montant} FCFA<br>
+          📅 ${t.date} à ${t.heure} <br>
+          📱 ${t.numero_destinataire}
+          <div class="actions">
+            <button class="edit" onclick="modifier('${t.id}')">Modifier</button>
+            <button class="delete" onclick="supprimer('${t.id}')">Supprimer</button>
+          </div>
+        `;
+        console.log(pageCotent);
+        div.innerHTML = pageCotent;
+        transactionsDiv.appendChild(div);
+      });
+    }
+
+    async function modifier(id) {
+      const res = await fetch(`/transactions/${id}`);
+      const t = await res.json();
+
+      // Remplir le formulaire
+      form.date.value = t.date;
+      form.heure.value = t.heure.slice(0,5); // enlever les secondes
+      form.montant.value = t.montant;
+      form.type_transaction.value = t.type_transaction;
+      form.numero_destinataire.value = t.numero_destinataire;
+      idField.value = t.id;
+    }
+
+    async function supprimer(id) {
+      if (!confirm("Voulez-vous vraiment supprimer cette transaction ?")) return;
+
+      await fetch(`/transactions/${id}`, { method: 'DELETE' });
+      chargerTransactions();
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const formData = new FormData(form);
+      const data = Object.fromEntries(formData.entries());
+      data.heure = data.heure + ":00";
+      data.montant = parseFloat(data.montant);
+
+      const id = idField.value;
+      const url = id ? `/transactions/${id}` : `/transactions`;
+      const method = id ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+
+      if (res.ok) {
+        form.reset();
+        idField.value = "";
+        chargerTransactions();
+      } else {
+        const error = await res.json();
+        alert("Erreur : " + error.detail);
+      }
+    });
+
+    chargerTransactions();
+  </script>
+
+</body>
+</html>
